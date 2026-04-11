@@ -1,5 +1,8 @@
 # Push to main → publish site on GitHub Pages.
 # Repo Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# 必须只有一个 job 调用 upload-pages-artifact，否则会出现
+# "Multiple artifacts named github-pages" 错误。
 name: Deploy GitHub Pages
 
 on:
@@ -16,15 +19,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - uses: actions/deploy-pages@v4
         id: deployment
