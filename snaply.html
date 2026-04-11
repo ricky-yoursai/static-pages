@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snaply — 拍照识别 · 轻社区</title>
+  <style>
+    :root {
+      --bg: #eaf5ff;
+      --surface: rgba(255, 255, 255, 0.78);
+      --text: #0f2144;
+      --muted: #5d8fe0;
+      --accent: #388dff;
+      --accent-soft: rgba(56, 141, 255, 0.16);
+      --border: rgba(56, 141, 255, 0.22);
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, rgba(56, 141, 255, 0.22), transparent 32%),
+                  linear-gradient(180deg, #f6fbff 0%, #e9f2ff 100%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .page {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.95rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 18px rgba(107, 99, 255, 0.55);
+    }
+    .hero {
+      display: grid;
+      gap: 32px;
+      padding: 48px 0 60px;
+    }
+    .hero-title {
+      font-size: clamp(2.8rem, 5vw, 4.4rem);
+      margin: 0;
+      max-width: 760px;
+      letter-spacing: -0.05em;
+    }
+    .hero-title strong {
+      color: #ffffff;
+    }
+    .hero-text {
+      max-width: 680px;
+      color: #cdd3ff;
+      font-size: 1.06rem;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+    .button.primary {
+      background: linear-gradient(135deg, #3c8cff, #78b8ff);
+      color: white;
+      box-shadow: 0 16px 40px rgba(56, 141, 255, 0.18);
+    }
+    .button.secondary {
+      color: var(--text);
+      border-color: rgba(56, 141, 255, 0.28);
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .button:hover {
+      transform: translateY(-2px);
+    }
+    .card-grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 28px;
+      backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(56, 141, 255, 0.18), transparent 28%);
+      pointer-events: none;
+    }
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 1.2rem;
+    }
+    .card p {
+      margin: 0;
+      color: #d5d9ff;
+    }
+    .section {
+      margin-top: 52px;
+    }
+    .section-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.85rem;
+      margin-bottom: 18px;
+    }
+    .highlight {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(56, 141, 255, 0.14);
+      color: #2d4f8f;
+    }
+    .feature-list {
+      display: grid;
+      gap: 20px;
+      margin-top: 18px;
+    }
+    .feature-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .feature-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: rgba(56, 141, 255, 0.18);
+      display: grid;
+      place-items: center;
+      font-size: 1.2rem;
+    }
+    .feature-item strong {
+      display: block;
+      margin-bottom: 6px;
+      color: white;
+    }
+    .bottom-note {
+      margin-top: 40px;
+      color: #8d94bf;
+      font-size: 0.95rem;
+    }
+    @media (min-width: 900px) {
+      .hero {
+        grid-template-columns: 1.05fr 0.95fr;
+        align-items: center;
+      }
+      .hero-text {
+        max-width: 520px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      SNAPLY
+    </div>
+
+    <section class="hero">
+      <div>
+        <h1 class="hero-title">我专注于拍照识别和轻社区，让信息更快落地。</h1>
+        <p class="hero-text">这是一个展示拍照识别与轻社区服务的页面，覆盖试卷、食谱、食物、小票等日常场景，帮助用户更方便地整理和分享记录。</p>
+        <div class="hero-actions">
+          <a href="#about" class="button primary">了解我的方向</a>
+          <a href="#features" class="button secondary">识别实力</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>项目定位</h3>
+        <p>Snaply 是一个拍照识别与轻社区展示页，强调实用场景：试卷、食谱、食物、发票、小票等信息的快速整理与分享。</p>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="section-title"><span class="highlight">关于我</span></div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>我是做什么的</h3>
+          <p>我是一个专注于拍照识别与轻社区的产品人，擅长把日常记录和社交分享结合成简单易用的服务。</p>
+        </div>
+        <div class="card">
+          <h3>我擅长的</h3>
+          <p>我擅长把拍照识别落地到生活场景，特别是试卷、食谱、食物、小票这种结构化内容的快速整理和展示。</p>
+        </div>
+        <div class="card">
+          <h3>适合场景</h3>
+          <p>适用于轻社区、学习辅助、餐饮服务、费用报销等场景，让拍照识别成为用户日常中最自然的一环。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-title"><span class="highlight">核心优势</span></div>
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">⚡</div>
+          <div>
+            <strong>拍照识别实用</strong>
+            <span>覆盖试卷、食谱、食物、小票等多种内容，帮助用户快速从图片中获取稳定的结果。</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🎨</div>
+          <div>
+            <strong>轻社区氛围</strong>
+            <span>强调信息分享与轻社交，让用户在识别后方便地连接内容与人。</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🧭</div>
+          <div>
+            <strong>内容识别可靠</strong>
+            <span>通过明确的内容分类与场景展示，让用户一眼看出你能识别什么，解决了哪些真实问题。</span>
+          </div>
+        </div>
+      </div>
+      <p class="bottom-note">这是一个面向现实场景的拍照识别项目页：试卷、食谱、食物、小票……让用户看到你的服务在日常生活中的实际价值。</p>
+    </section>
+  </main>
+</body>
+</html>
