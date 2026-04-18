@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Port Description</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.9rem;
+    }
+    p {
+      margin: 0 0 18px;
+      color: #334155;
+    }
+    .status {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+    .status.busy {
+      color: #0369a1;
+    }
+    .status.success {
+      color: #15803d;
+    }
+    .error {
+      color: #b91c1c;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    tr[data-port-row] {
+      cursor: grab;
+    }
+    tr[data-port-row].dragging {
+      opacity: 0.5;
+    }
+    tr[data-port-row].drag-over td {
+      background: #e0f2fe;
+    }
+    .empty {
+      color: #64748b;
+      padding: 12px 0;
+    }
+    code {
+      background: #e2e8f0;
+      border-radius: 6px;
+      padding: 1px 6px;
+    }
+    .input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      color: #0f172a;
+      background: #ffffff;
+    }
+    .button {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .button.primary {
+      background: #0ea5e9;
+      border-color: #0ea5e9;
+      color: #ffffff;
+    }
+    .button.danger {
+      border-color: #ef4444;
+      color: #b91c1c;
+      background: #fff5f5;
+    }
+    .button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .bottom-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Project Port Description</h1>
+    <p>Data source: <code>MSetting / global</code>, displaying only record <code>id = 1</code>. Drag rows to reorder.</p>
+    <div id="status" class="status">Loading data...</div>
+    <div id="errorBox" class="error" hidden></div>
+    <table aria-label="Port description table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Port</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="bottom-actions">
+      <button id="addRowButton" class="button" type="button">Add Port</button>
+      <button id="saveAllButton" class="button primary" type="button">Save</button>
+    </div>
+    <div id="emptyBox" class="empty" hidden>No data found for id = 1.</div>
+  </main>
+
+  <script type="module">
+    import { getGlobalPortSettings, updateGlobalPortSettings } from "../../request/index.js";
+
+    const statusEl = document.getElementById("status");
+    const errorBoxEl = document.getElementById("errorBox");
+    const tableBodyEl = document.getElementById("tableBody");
+    const emptyBoxEl = document.getElementById("emptyBox");
+    const addRowButtonEl = document.getElementById("addRowButton");
+    const saveAllButtonEl = document.getElementById("saveAllButton");
+
+    let currentRecordId = 1;
+    let currentRows = [];
+    let pending = false;
+
+    function setStatus(message, type = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`.trim();
+    }
+
+    function setPending(isPending) {
+      pending = isPending;
+      addRowButtonEl.disabled = isPending;
+      saveAllButtonEl.disabled = isPending;
+      document.querySelectorAll("button[data-row-action]").forEach((button) => {
+        button.disabled = isPending;
+      });
+      document.querySelectorAll("tr[data-port-row]").forEach((row) => {
+        row.draggable = !isPending;
+      });
+    }
+
+    function normalizeInputRows() {
+      const nextRows = [];
+      const rows = tableBodyEl.querySelectorAll("tr[data-port-row]");
+      rows.forEach((row) => {
+        const portInput = row.querySelector("input[data-field='port']");
+        const descInput = row.querySelector("input[data-field='description']");
+        const port = portInput.value.trim();
+        const description = descInput.value.trim();
+        if (port) {
+          nextRows.push({ port, description });
+        }
+      });
+      return nextRows;
+    }
+
+    function rowsToSetting(rows) {
+      const port = {};
+      const portOrder = [];
+
+      rows.forEach((row) => {
+        if (!row.port) {
+          return;
+        }
+        port[row.port] = row.description ?? "";
+        portOrder.push(row.port);
+      });
+
+      return { port, portOrder };
+    }
+
+    function buildRowsFromSetting(setting) {
+      const portMap = setting?.port ?? {};
+      const orderedKeys = Array.isArray(setting?.portOrder) ? setting.portOrder : [];
+      const rows = [];
+      const visited = new Set();
+
+      orderedKeys.forEach((port) => {
+        if (Object.prototype.hasOwnProperty.call(portMap, port)) {
+          rows.push({ port, description: portMap[port] ?? "" });
+          visited.add(port);
+        }
+      });
+
+      Object.entries(portMap).forEach(([port, description]) => {
+        if (!visited.has(port)) {
+          rows.push({ port, description: description ?? "" });
+        }
+      });
+
+      return rows;
+    }
+
+    async function persistRows(nextRows, actionMessage) {
+      setPending(true);
+      errorBoxEl.hidden = true;
+      setStatus("Saving...", "busy");
+      await updateGlobalPortSettings(rowsToSetting(nextRows));
+      currentRows = nextRows.map((row) => ({ ...row }));
+      renderRows(currentRows);
+      setStatus(actionMessage, "success");
+      setPending(false);
+    }
+
+    function createRow(port, description) {
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-port-row", "true");
+      tr.draggable = true;
+      tr.innerHTML = `
+        <td>${currentRecordId}</td>
+        <td><input class="input" data-field="port" value="${port}" placeholder="Port, e.g. 9616"></td>
+        <td><input class="input" data-field="description" value="${description}" placeholder="Description"></td>
+        <td>
+          <div class="actions">
+            <button class="button danger" data-row-action="delete" type="button">Delete</button>
+          </div>
+        </td>
+      `;
+      return tr;
+    }
+
+    function renderRows(rows) {
+      tableBodyEl.innerHTML = "";
+      emptyBoxEl.hidden = rows.length > 0;
+
+      rows.forEach((row) => {
+        tableBodyEl.appendChild(createRow(row.port, row.description));
+      });
+    }
+
+    async function handleAddRow() {
+      try {
+        const draftRows = normalizeInputRows();
+        const usedPorts = new Set(draftRows.map((row) => row.port));
+        let seed = 9616;
+        while (usedPorts.has(String(seed))) {
+          seed += 1;
+        }
+        draftRows.push({ port: String(seed), description: "" });
+        await persistRows(draftRows, "Added a new port row.");
+      } catch (error) {
+        setPending(false);
+        setStatus("Failed to add row.");
+        errorBoxEl.hidden = false;
+        errorBoxEl.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
+
+    async function handleDeleteRow(row) {
+      try {
+        const currentPortInput = row.querySelector("input[data-field='port']");
+        const targetPort = currentPortInput.value.trim();
+        if (!targetPort) {
+          throw new Error("Cannot delete a row without a port value.");
+        }
+
+        const draftRows = normalizeInputRows().filter((item) => item.port !== targetPort);
+        await persistRows(draftRows, `Deleted port ${targetPort}.`);
+      } catch (error) {
+        setPending(false);
+        setStatus("Failed to delete row.");
+        errorBoxEl.hidden = false;
+        errorBoxEl.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
+
+    async function handleSaveAll() {
+      try {
+        const draftRows = normalizeInputRows();
+        await persistRows(draftRows, "Saved port settings.");
+      } catch (error) {
+        setPending(false);
+        setStatus("Failed to save row.");
+        errorBoxEl.hidden = false;
+        errorBoxEl.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
+
+    async function loadData() {
+      try {
+        const payload = await getGlobalPortSettings();
+        const records = payload?.data?.data ?? [];
+        const targetRecord = records.find((item) => item?.id === 1);
+
+        if (!targetRecord) {
+          setStatus("Loaded, but id = 1 was not returned.");
+          emptyBoxEl.hidden = false;
+          return;
+        }
+
+        currentRecordId = targetRecord.id;
+        currentRows = buildRowsFromSetting(targetRecord?.setting ?? {});
+        renderRows(currentRows);
+
+        const count = currentRows.length;
+        setStatus(`Loaded successfully (${count} row${count > 1 ? "s" : ""}).`);
+      } catch (error) {
+        setStatus("Failed to load data.");
+        errorBoxEl.hidden = false;
+        errorBoxEl.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
+
+    addRowButtonEl.addEventListener("click", () => {
+      if (!pending) {
+        handleAddRow();
+      }
+    });
+
+    saveAllButtonEl.addEventListener("click", () => {
+      if (!pending) {
+        handleSaveAll();
+      }
+    });
+
+    tableBodyEl.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-row-action]");
+      if (!button || pending) {
+        return;
+      }
+
+      const row = button.closest("tr[data-port-row]");
+      const action = button.dataset.rowAction;
+
+      if (action === "delete" && row) {
+        handleDeleteRow(row);
+      }
+    });
+
+    let draggedRow = null;
+
+    tableBodyEl.addEventListener("dragstart", (event) => {
+      const row = event.target.closest("tr[data-port-row]");
+      if (!row || pending) {
+        return;
+      }
+      draggedRow = row;
+      row.classList.add("dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+      }
+    });
+
+    tableBodyEl.addEventListener("dragover", (event) => {
+      const targetRow = event.target.closest("tr[data-port-row]");
+      if (!draggedRow || !targetRow || targetRow === draggedRow || pending) {
+        return;
+      }
+      event.preventDefault();
+      targetRow.classList.add("drag-over");
+    });
+
+    tableBodyEl.addEventListener("dragleave", (event) => {
+      const targetRow = event.target.closest("tr[data-port-row]");
+      if (targetRow) {
+        targetRow.classList.remove("drag-over");
+      }
+    });
+
+    tableBodyEl.addEventListener("drop", async (event) => {
+      const targetRow = event.target.closest("tr[data-port-row]");
+      if (!draggedRow || !targetRow || targetRow === draggedRow || pending) {
+        return;
+      }
+
+      event.preventDefault();
+      targetRow.classList.remove("drag-over");
+
+      try {
+        const rows = Array.from(tableBodyEl.querySelectorAll("tr[data-port-row]"));
+        const fromIndex = rows.indexOf(draggedRow);
+        const toIndex = rows.indexOf(targetRow);
+        if (fromIndex === -1 || toIndex === -1) {
+          return;
+        }
+
+        const orderedRows = normalizeInputRows();
+        const [movedEntry] = orderedRows.splice(fromIndex, 1);
+        if (!movedEntry) {
+          return;
+        }
+        orderedRows.splice(toIndex, 0, movedEntry);
+        await persistRows(orderedRows, "Reordered rows.");
+      } catch (error) {
+        setPending(false);
+        setStatus("Failed to reorder rows.");
+        errorBoxEl.hidden = false;
+        errorBoxEl.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+    });
+
+    tableBodyEl.addEventListener("dragend", () => {
+      document.querySelectorAll("tr[data-port-row]").forEach((row) => {
+        row.classList.remove("dragging");
+        row.classList.remove("drag-over");
+      });
+      draggedRow = null;
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
