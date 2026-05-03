@@ -257,6 +257,28 @@
       background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(2px);
     }
+    #tocContextMenu {
+      display: none;
+      position: fixed;
+      background: white;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      border-radius: 6px;
+      padding: 4px;
+      z-index: 1000;
+      min-width: 150px;
+    }
+    .context-menu-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #334155;
+      border-radius: 4px;
+      transition: background 0.1s;
+    }
+    .context-menu-item:hover {
+      background: #f1f5f9;
+    }
   </style>
 </head>
 <body>
@@ -268,6 +290,7 @@
     <div class="actions">
       <input type="file" id="fileInput" accept=".md" style="display: none;">
       <button id="uploadBtn" class="button">Upload MD</button>
+      <button id="exportBtn" class="button">Export</button>
       <button id="toggleSidebarButton" class="button">Toggle TOC</button>
       <button id="formatButton" class="button" disabled>Format</button>
       <button id="togglePreviewButton" class="button">Toggle Preview</button>
@@ -292,6 +315,24 @@
       <div id="preview" class="preview-content"></div>
     </div>
   </main>
+
+  <dialog id="exportModal">
+    <div style="display: flex; flex-direction: column; width: 400px; max-width: 90vw;">
+      <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 1.1rem;">Export Sections</div>
+      <div style="padding: 24px; background: #f8fafc; max-height: 400px; overflow-y: auto;">
+        <label style="display: block; margin-bottom: 12px; font-size: 14px; font-weight: 500; color: #334155;">Select Sections to Export:</label>
+        <div id="exportSectionCheckboxes" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+      <div style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background: white;">
+        <button id="cancelExportBtn" class="button">Cancel</button>
+        <button id="confirmExportBtn" class="button primary">Export</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="tocContextMenu">
+    <div id="exportContextBtn" class="context-menu-item">Export Section</div>
+  </div>
 
   <dialog id="previewModal">
     <div style="display: flex; flex-direction: column; height: 600px; max-height: 80vh;">
@@ -322,6 +363,7 @@
     const togglePreviewButtonEl = document.getElementById('togglePreviewButton');
     const toggleSidebarButtonEl = document.getElementById('toggleSidebarButton');
     const uploadBtn = document.getElementById('uploadBtn');
+    const exportBtn = document.getElementById('exportBtn');
     
     // File upload elements
     const fileInput = document.getElementById('fileInput');
@@ -331,6 +373,14 @@
     const cancelAppendBtn = document.getElementById('cancelAppendBtn');
     const confirmAppendBtn = document.getElementById('confirmAppendBtn');
 
+    // Export elements
+    const exportModal = document.getElementById('exportModal');
+    const exportSectionCheckboxes = document.getElementById('exportSectionCheckboxes');
+    const cancelExportBtn = document.getElementById('cancelExportBtn');
+    const confirmExportBtn = document.getElementById('confirmExportBtn');
+    const tocContextMenu = document.getElementById('tocContextMenu');
+    const exportContextBtn = document.getElementById('exportContextBtn');
+
     // TOC elements
     const tocList = document.getElementById('tocList');
 
@@ -339,6 +389,7 @@
     let currentSections = [];
     let pendingAppendText = "";
     let collapsedKeys = new Set();
+    let contextMenuSectionIndex = null;
 
     function setStatus(msg) {
       statusEl.textContent = msg;
@@ -510,6 +561,14 @@
           editorEl.scrollTop = percentage * editorEl.scrollHeight;
         });
 
+        li.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          contextMenuSectionIndex = idx;
+          tocContextMenu.style.display = 'block';
+          tocContextMenu.style.left = e.clientX + 'px';
+          tocContextMenu.style.top = e.clientY + 'px';
+        });
+
         tocList.appendChild(li);
       });
     }
@@ -558,6 +617,121 @@
       
       setEditorValueWithUndo(newMd);
     }
+
+    document.addEventListener('click', (e) => {
+      if (tocContextMenu && !tocContextMenu.contains(e.target)) {
+        tocContextMenu.style.display = 'none';
+      }
+    });
+
+    function downloadMarkdown(filename, content) {
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    exportContextBtn.addEventListener('click', () => {
+      tocContextMenu.style.display = 'none';
+      if (contextMenuSectionIndex !== null) {
+        const sec = currentSections[contextMenuSectionIndex];
+        if (sec) {
+          downloadMarkdown(`${sec.title.trim()}.md`, sec.content);
+        }
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      exportSectionCheckboxes.innerHTML = '';
+      const checkboxes = [];
+      currentSections.forEach((sec, idx) => {
+        const wrapper = document.createElement('label');
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.gap = '8px';
+        wrapper.style.cursor = 'pointer';
+        wrapper.style.fontSize = '14px';
+        wrapper.style.color = '#334155';
+        
+        const padding = (sec.level - 1) * 16;
+        wrapper.style.paddingLeft = `${padding}px`;
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = idx;
+        cb.className = 'export-checkbox';
+
+        cb.addEventListener('change', (e) => {
+          const checked = e.target.checked;
+          const startLevel = sec.level;
+          for (let i = idx + 1; i < currentSections.length; i++) {
+            if (currentSections[i].level > startLevel) {
+              if (checkboxes[i]) checkboxes[i].checked = checked;
+            } else {
+              break;
+            }
+          }
+        });
+
+        const span = document.createElement('span');
+        span.textContent = sec.title;
+
+        wrapper.appendChild(cb);
+        wrapper.appendChild(span);
+        exportSectionCheckboxes.appendChild(wrapper);
+        checkboxes.push(cb);
+      });
+      exportModal.showModal();
+    });
+
+    cancelExportBtn.addEventListener('click', () => {
+      exportModal.close();
+    });
+
+    confirmExportBtn.addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll('.export-checkbox:checked');
+      if (checkboxes.length === 0) return;
+
+      const selectedSections = [];
+      let minLevel = 999;
+      const md = editorEl.value;
+
+      checkboxes.forEach(cb => {
+        const idx = parseInt(cb.value, 10);
+        if (!isNaN(idx)) {
+          const sec = currentSections[idx];
+          if (sec) {
+            selectedSections.push({ sec, idx });
+            if (sec.level < minLevel) {
+              minLevel = sec.level;
+            }
+          }
+        }
+      });
+
+      if (selectedSections.length === 0) return;
+
+      const topLevelTitles = selectedSections
+        .filter(item => item.sec.level === minLevel)
+        .map(item => item.sec.title.trim())
+        .join('_');
+
+      const filename = topLevelTitles ? `${topLevelTitles}.md` : 'export.md';
+
+      const combinedContent = selectedSections.map(item => {
+        const nextSec = currentSections[item.idx + 1];
+        const ownEnd = nextSec ? nextSec.start : md.length;
+        return md.slice(item.sec.start, ownEnd);
+      }).join('');
+
+      downloadMarkdown(filename, combinedContent);
+      exportModal.close();
+    });
 
     // ========== Editor & Preview Logic ==========
     function setEditorValueWithUndo(newVal) {
