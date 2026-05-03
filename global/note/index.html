@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Note Editor</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/prettier@3.0.3/standalone.js"></script>
+  <script src="https://unpkg.com/prettier@3.0.3/plugins/markdown.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: #0f172a;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: white;
+      padding: 16px 24px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #1e293b;
+    }
+    .status {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-left: 16px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .button {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .button:hover:not(:disabled) {
+      background: #f1f5f9;
+    }
+    .button.primary {
+      background: #0ea5e9;
+      border-color: #0ea5e9;
+      color: #ffffff;
+    }
+    .button.primary:hover:not(:disabled) {
+      background: #0284c7;
+    }
+    .button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 250px;
+      border-right: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .editor-pane, .preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .editor-pane {
+      border-right: 1px solid #e2e8f0;
+      position: relative;
+    }
+    .pane-header {
+      padding: 12px 24px;
+      background: #f1f5f9;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    textarea {
+      flex: 1;
+      border: none;
+      padding: 24px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: none;
+      background: #ffffff;
+      color: #334155;
+      outline: none;
+    }
+    .preview-content {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      background: #ffffff;
+      line-height: 1.6;
+      color: #334155;
+    }
+    .preview-content h1, .preview-content h2, .preview-content h3 {
+      color: #0f172a;
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+    }
+    .preview-content pre {
+      background: #f1f5f9;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .preview-content code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9em;
+    }
+    .preview-content pre code {
+      background: none;
+      padding: 0;
+    }
+    .preview-content blockquote {
+      border-left: 4px solid #cbd5e1;
+      margin-left: 0;
+      padding-left: 16px;
+      color: #64748b;
+    }
+    .preview-content img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
+    #errorBox {
+      display: none;
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 12px 24px;
+      border-bottom: 1px solid #fecaca;
+      font-size: 0.9rem;
+    }
+    /* TOC Styles */
+    #tocList {
+      list-style: none;
+      padding: 12px;
+      margin: 0;
+    }
+    .toc-item {
+      padding: 6px 8px;
+      cursor: grab;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      font-size: 13px;
+      color: #334155;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      user-select: none;
+      border: 1px solid transparent;
+      transition: background 0.1s;
+    }
+    .toc-item:hover {
+      background: #e2e8f0;
+    }
+    .toc-item.dragging {
+      opacity: 0.5;
+    }
+    .toc-item.drag-over-top {
+      border-top: 2px solid #0ea5e9;
+      background: #f0f9ff;
+    }
+    .toc-item.drag-over-bottom {
+      border-bottom: 2px solid #0ea5e9;
+      background: #f0f9ff;
+    }
+    .toc-item.drag-over-middle {
+      background: #e0f2fe;
+      border: 1px dashed #0ea5e9;
+    }
+    /* Separator & TOC layout */
+    .separator {
+      width: 14px;
+      background: #f8fafc;
+      border-right: 1px solid #e2e8f0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      user-select: none;
+      font-size: 10px;
+      color: #64748b;
+    }
+    .separator:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .toc-item-content {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+    .toc-caret {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      margin-right: 4px;
+    }
+    .toc-caret:hover {
+      background: #cbd5e1;
+    }
+    .toc-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Modal Styles */
+    dialog {
+      padding: 0;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      width: 90%;
+      max-width: 800px;
+      background: white;
+    }
+    dialog::backdrop {
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(2px);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; align-items: center;">
+      <h1>Global Note</h1>
+      <span id="status" class="status">Initializing...</span>
+    </div>
+    <div class="actions">
+      <input type="file" id="fileInput" accept=".md" style="display: none;">
+      <button id="uploadBtn" class="button">Upload MD</button>
+      <button id="toggleSidebarButton" class="button">Toggle TOC</button>
+      <button id="formatButton" class="button" disabled>Format</button>
+      <button id="togglePreviewButton" class="button">Toggle Preview</button>
+      <button id="saveButton" class="button primary" disabled>Save Note</button>
+    </div>
+  </header>
+  
+  <div id="errorBox"></div>
+
+  <main>
+    <div class="sidebar" id="sidebar" style="display: flex;">
+      <div class="pane-header">Table of Contents</div>
+      <ul id="tocList"></ul>
+    </div>
+    <div class="separator" id="sidebarSeparator">◀</div>
+    <div class="editor-pane" id="editorPane">
+      <div class="pane-header">Markdown Editor</div>
+      <textarea id="editor" placeholder="Write your markdown here..." disabled></textarea>
+    </div>
+    <div class="preview-pane" id="previewPane">
+      <div class="pane-header">Live Preview</div>
+      <div id="preview" class="preview-content"></div>
+    </div>
+  </main>
+
+  <dialog id="previewModal">
+    <div style="display: flex; flex-direction: column; height: 600px; max-height: 80vh;">
+      <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 1.1rem;">Confirm Append File</div>
+      <div id="filePreviewContent" style="flex: 1; padding: 24px; overflow-y: auto; white-space: pre-wrap; font-family: ui-monospace, monospace; background: #f8fafc; font-size: 14px; color: #334155;"></div>
+      <div style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background: white;">
+        <button id="cancelAppendBtn" class="button">Cancel</button>
+        <button id="confirmAppendBtn" class="button primary">Append to Note</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module">
+    import { requireAuth } from "../auth.js";
+    import { getGlobalPortSettings, updateGlobalNoteSetting } from "../../request/index.js";
+
+    const editorEl = document.getElementById('editor');
+    const previewEl = document.getElementById('preview');
+    const previewPaneEl = document.getElementById('previewPane');
+    const sidebarEl = document.getElementById('sidebar');
+    const sidebarSeparator = document.getElementById('sidebarSeparator');
+    const statusEl = document.getElementById('status');
+    const errorBoxEl = document.getElementById('errorBox');
+    
+    // Buttons
+    const saveButtonEl = document.getElementById('saveButton');
+    const formatButtonEl = document.getElementById('formatButton');
+    const togglePreviewButtonEl = document.getElementById('togglePreviewButton');
+    const toggleSidebarButtonEl = document.getElementById('toggleSidebarButton');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    // File upload elements
+    const fileInput = document.getElementById('fileInput');
+    const editorPaneEl = document.getElementById('editorPane');
+    const previewModal = document.getElementById('previewModal');
+    const filePreviewContent = document.getElementById('filePreviewContent');
+    const cancelAppendBtn = document.getElementById('cancelAppendBtn');
+    const confirmAppendBtn = document.getElementById('confirmAppendBtn');
+
+    // TOC elements
+    const tocList = document.getElementById('tocList');
+
+    let pending = false;
+    let initialNote = "";
+    let currentSections = [];
+    let pendingAppendText = "";
+    let collapsedKeys = new Set();
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function showError(msg) {
+      if (msg) {
+        errorBoxEl.textContent = msg;
+        errorBoxEl.style.display = 'block';
+      } else {
+        errorBoxEl.style.display = 'none';
+      }
+    }
+
+    // ========== TOC Logic ==========
+    function updateTOC() {
+      const md = editorEl.value;
+      const regex = /^(#{1,6})\s+(.*)$/gm;
+      currentSections = [];
+      let match;
+      while ((match = regex.exec(md)) !== null) {
+        currentSections.push({
+          level: match[1].length,
+          title: match[2],
+          start: match.index,
+          rawTitle: match[0]
+        });
+      }
+      for (let i = 0; i < currentSections.length; i++) {
+        const sec = currentSections[i];
+        let end = md.length;
+        for (let j = i + 1; j < currentSections.length; j++) {
+          if (currentSections[j].level <= sec.level) {
+            end = currentSections[j].start;
+            break;
+          }
+        }
+        sec.end = end;
+        sec.content = md.slice(sec.start, sec.end);
+      }
+      renderTOC();
+    }
+
+    let draggedSectionIndex = null;
+
+    function renderTOC() {
+      tocList.innerHTML = "";
+      let hideLevelThreshold = 999; 
+
+      currentSections.forEach((sec, idx) => {
+        if (sec.level <= hideLevelThreshold) {
+          hideLevelThreshold = 999;
+        }
+
+        if (hideLevelThreshold !== 999) return;
+
+        const li = document.createElement('li');
+        li.className = 'toc-item';
+        li.style.paddingLeft = `${(sec.level - 1) * 12 + 8}px`;
+        li.draggable = true;
+        li.dataset.index = idx;
+
+        const container = document.createElement('div');
+        container.className = 'toc-item-content';
+
+        const hasChildren = currentSections[idx + 1] && currentSections[idx + 1].level > sec.level;
+        const key = `${sec.level}-${sec.title}`;
+        const isCollapsed = collapsedKeys.has(key);
+
+        const caret = document.createElement('span');
+        caret.className = 'toc-caret';
+
+        if (hasChildren) {
+          caret.innerHTML = isCollapsed ? '▶' : '▼';
+          if (isCollapsed) {
+            hideLevelThreshold = sec.level;
+          }
+          caret.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isCollapsed) collapsedKeys.delete(key);
+            else collapsedKeys.add(key);
+            renderTOC();
+          });
+        } else {
+          caret.innerHTML = '•';
+          caret.style.cursor = 'default';
+          caret.style.color = '#94a3b8';
+        }
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'toc-title';
+        titleSpan.textContent = sec.title;
+
+        container.appendChild(caret);
+        container.appendChild(titleSpan);
+        li.appendChild(container);
+        
+        li.addEventListener('dragstart', (e) => {
+          draggedSectionIndex = idx;
+          li.classList.add('dragging');
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+          }
+        });
+        
+        li.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (draggedSectionIndex === null || draggedSectionIndex === idx) return;
+          const draggedSec = currentSections[draggedSectionIndex];
+          const targetSec = currentSections[idx];
+          
+          if (targetSec.start >= draggedSec.start && targetSec.start < draggedSec.end) {
+            return;
+          }
+
+          const rect = li.getBoundingClientRect();
+          const y = e.clientY - rect.top;
+          const h = rect.height;
+
+          li.classList.remove('drag-over-top', 'drag-over-middle', 'drag-over-bottom');
+
+          if (y < h * 0.25) {
+            li.classList.add('drag-over-top');
+          } else if (y > h * 0.75) {
+            li.classList.add('drag-over-bottom');
+          } else {
+            li.classList.add('drag-over-middle');
+          }
+        });
+
+        li.addEventListener('dragleave', (e) => {
+          li.classList.remove('drag-over-top', 'drag-over-middle', 'drag-over-bottom');
+        });
+
+        li.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const wasTop = li.classList.contains('drag-over-top');
+          const wasMiddle = li.classList.contains('drag-over-middle');
+          
+          li.classList.remove('drag-over-top', 'drag-over-middle', 'drag-over-bottom');
+          
+          if (draggedSectionIndex === null || draggedSectionIndex === idx) return;
+
+          const draggedSec = currentSections[draggedSectionIndex];
+          const targetSec = currentSections[idx];
+          if (targetSec.start >= draggedSec.start && targetSec.start < draggedSec.end) {
+            return;
+          }
+
+          let position = 'after';
+          if (wasTop) position = 'before';
+          else if (wasMiddle) position = 'child';
+
+          reorderTOC(draggedSectionIndex, idx, position);
+        });
+
+        li.addEventListener('dragend', () => {
+          li.classList.remove('dragging');
+          document.querySelectorAll('.toc-item').forEach(i => {
+            i.classList.remove('drag-over-top', 'drag-over-middle', 'drag-over-bottom');
+          });
+          draggedSectionIndex = null;
+        });
+
+        li.addEventListener('click', () => {
+          editorEl.focus();
+          editorEl.setSelectionRange(sec.start, sec.start);
+          const percentage = sec.start / editorEl.value.length;
+          editorEl.scrollTop = percentage * editorEl.scrollHeight;
+        });
+
+        tocList.appendChild(li);
+      });
+    }
+
+    function shiftHeadings(content, levelShift) {
+      if (levelShift === 0) return content;
+      return content.replace(/^(#{1,6})(\s+.*)$/gm, (match, hashes, rest) => {
+        let newCount = hashes.length + levelShift;
+        newCount = Math.max(1, Math.min(6, newCount));
+        return '#'.repeat(newCount) + rest;
+      });
+    }
+
+    function reorderTOC(sourceIdx, targetIdx, position) {
+      const md = editorEl.value;
+      const source = currentSections[sourceIdx];
+      const target = currentSections[targetIdx];
+      
+      if (!source || !target) return;
+
+      let newLevel = target.level;
+      if (position === 'child') newLevel = target.level + 1;
+      newLevel = Math.max(1, Math.min(6, newLevel));
+      
+      const levelShift = newLevel - source.level;
+      
+      let sourceContent = source.content;
+      sourceContent = shiftHeadings(sourceContent, levelShift);
+
+      const mdWithoutSource = md.slice(0, source.start) + md.slice(source.end);
+
+      let insertPos = position === 'before' ? target.start : target.end;
+      
+      if (source.start < insertPos) {
+        insertPos -= (source.end - source.start);
+      }
+
+      if (insertPos > 0 && !mdWithoutSource.slice(0, insertPos).endsWith('\n')) {
+        sourceContent = '\n' + sourceContent;
+      }
+      if (insertPos < mdWithoutSource.length && !sourceContent.endsWith('\n')) {
+        sourceContent += '\n';
+      }
+
+      const newMd = mdWithoutSource.slice(0, insertPos) + sourceContent + mdWithoutSource.slice(insertPos);
+      
+      setEditorValueWithUndo(newMd);
+    }
+
+    // ========== Editor & Preview Logic ==========
+    function setEditorValueWithUndo(newVal) {
+      const scroll = editorEl.scrollTop;
+      editorEl.focus();
+      editorEl.select();
+      const success = document.execCommand('insertText', false, newVal);
+      if (!success) {
+        editorEl.value = newVal;
+      }
+      editorEl.scrollTop = scroll;
+      updatePreview();
+    }
+
+    function updatePreview() {
+      const val = editorEl.value;
+      if (window.marked) {
+        previewEl.innerHTML = marked.parse(val);
+      } else {
+        previewEl.innerHTML = val.replace(/\n/g, '<br>');
+      }
+      
+      if (val !== initialNote) {
+        saveButtonEl.textContent = "Save Note*";
+        saveButtonEl.style.opacity = "1";
+      } else {
+        saveButtonEl.textContent = "Save Note";
+      }
+
+      updateTOC();
+    }
+
+    editorEl.addEventListener('input', updatePreview);
+
+    editorEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        document.execCommand('insertText', false, "  ");
+        updatePreview();
+      }
+    });
+
+    // ========== File Upload & Drag/Drop ==========
+    function handleFiles(files) {
+      const file = files[0];
+      if (!file) return;
+      if (!file.name.endsWith('.md')) {
+        alert("Only .md files are supported.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        pendingAppendText = e.target.result;
+        filePreviewContent.textContent = pendingAppendText;
+        previewModal.showModal();
+      };
+      reader.readAsText(file);
+    }
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFiles(e.target.files);
+    });
+
+    editorPaneEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      // Allow drop for file, but ignore if dragging TOC
+      if (draggedSectionIndex === null) {
+        editorPaneEl.style.background = '#f1f5f9';
+      }
+    });
+    
+    editorPaneEl.addEventListener('dragleave', (e) => {
+      editorPaneEl.style.background = '';
+    });
+    
+    editorPaneEl.addEventListener('drop', (e) => {
+      editorPaneEl.style.background = '';
+      if (draggedSectionIndex !== null) return; // ignore TOC drags
+      
+      e.preventDefault();
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    cancelAppendBtn.addEventListener('click', () => {
+      previewModal.close();
+      pendingAppendText = "";
+      fileInput.value = "";
+    });
+
+    confirmAppendBtn.addEventListener('click', () => {
+      previewModal.close();
+      const val = editorEl.value;
+      const spacer = (val.endsWith('\n') || val === "") ? "" : "\n\n";
+      setEditorValueWithUndo(val + spacer + pendingAppendText);
+      pendingAppendText = "";
+      fileInput.value = "";
+    });
+
+    // ========== Buttons & UI Toggle ==========
+    formatButtonEl.addEventListener('click', async () => {
+      if (window.prettier && window.prettierPlugins && window.prettierPlugins.markdown) {
+        try {
+          const formatted = await prettier.format(editorEl.value, {
+            parser: "markdown",
+            plugins: window.prettierPlugins,
+          });
+          setEditorValueWithUndo(formatted);
+        } catch (err) {
+          console.error("Format error", err);
+        }
+      }
+    });
+
+    let previewVisible = true;
+    togglePreviewButtonEl.addEventListener('click', () => {
+      previewVisible = !previewVisible;
+      previewPaneEl.style.display = previewVisible ? 'flex' : 'none';
+    });
+
+    let sidebarVisible = true;
+    function toggleSidebar() {
+      sidebarVisible = !sidebarVisible;
+      sidebarEl.style.display = sidebarVisible ? 'flex' : 'none';
+      sidebarSeparator.innerHTML = sidebarVisible ? '◀' : '▶';
+    }
+    toggleSidebarButtonEl.addEventListener('click', toggleSidebar);
+    sidebarSeparator.addEventListener('click', toggleSidebar);
+
+    // ========== Data Persistence ==========
+    async function loadData() {
+      try {
+        setStatus("Loading...");
+        saveButtonEl.disabled = true;
+        formatButtonEl.disabled = true;
+        editorEl.disabled = true;
+        showError("");
+
+        const payload = await getGlobalPortSettings();
+        const records = payload?.data?.data ?? [];
+        const targetRecord = records.find((item) => item?.id === 1);
+
+        if (!targetRecord) {
+          throw new Error("Record id=1 not found");
+        }
+
+        initialNote = targetRecord?.setting?.note || "";
+        editorEl.value = initialNote;
+        updatePreview();
+        
+        setStatus("Loaded");
+        saveButtonEl.disabled = false;
+        formatButtonEl.disabled = false;
+        editorEl.disabled = false;
+      } catch (err) {
+        setStatus("Load Failed");
+        showError(err.message);
+      }
+    }
+
+    async function handleSave() {
+      try {
+        pending = true;
+        setStatus("Saving...");
+        saveButtonEl.disabled = true;
+        formatButtonEl.disabled = true;
+        editorEl.disabled = true;
+        showError("");
+
+        const newNote = editorEl.value;
+        await updateGlobalNoteSetting(newNote);
+        
+        initialNote = newNote;
+        updatePreview();
+        setStatus("Saved");
+      } catch (err) {
+        setStatus("Save Failed");
+        showError(err.message);
+      } finally {
+        pending = false;
+        saveButtonEl.disabled = false;
+        formatButtonEl.disabled = false;
+        editorEl.disabled = false;
+      }
+    }
+
+    saveButtonEl.addEventListener('click', handleSave);
+    
+    // Add Cmd/Ctrl+S support
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!pending && !saveButtonEl.disabled) {
+          handleSave();
+        }
+      }
+    });
+
+    if (requireAuth()) {
+      loadData();
+    } else {
+      window.addEventListener('auth-success', () => {
+        loadData();
+      });
+    }
+  </script>
+</body>
+</html>

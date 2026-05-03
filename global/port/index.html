@@ -155,6 +155,7 @@
   </main>
 
   <script type="module">
+    import { requireAuth } from "../auth.js";
     import { getGlobalPortSettings, updateGlobalPortSettings } from "../../request/index.js";
 
     const statusEl = document.getElementById("status");
@@ -443,7 +444,13 @@
       draggedRow = null;
     });
 
-    loadData();
+    if (requireAuth()) {
+      loadData();
+    } else {
+      window.addEventListener('auth-success', () => {
+        loadData();
+      });
+    }
   </script>
 </body>
 </html>
