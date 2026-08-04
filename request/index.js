@@ -1,5 +1,10 @@
-const GLOBAL_SETTINGS_URL = "https://file.yoursai.cn:9709/common/v2/api/all?themeTable=MSetting&db=global";
-const GLOBAL_SETTINGS_UPDATE_URL = "https://file.yoursai.cn:9709/common/v2/api/update/1?themeTable=MSetting&db=global";
+// const GLOBAL_SETTINGS_URL = "https://file.yoursai.cn:9709/common/v2/api/all?themeTable=MSetting&db=global";
+// const GLOBAL_SETTINGS_UPDATE_URL = "https://file.yoursai.cn:9709/common/v2/api/update/1?themeTable=MSetting&db=global";
+
+const GLOBAL_SETTINGS_URL =
+  "https://zyvera.cn/common_backend/common/v2/api/all?themeTable=MSetting&db=global";
+const GLOBAL_SETTINGS_UPDATE_URL =
+  "https://zyvera.cn/common_backend/common/v2/api/update/1?themeTable=MSetting&db=global";
 
 /**
  * Fetch global project port settings.
@@ -7,7 +12,7 @@ const GLOBAL_SETTINGS_UPDATE_URL = "https://file.yoursai.cn:9709/common/v2/api/u
  */
 export async function getGlobalPortSettings() {
   const response = await fetch(GLOBAL_SETTINGS_URL, {
-    method: "GET"
+    method: "GET",
   });
 
   if (!response.ok) {
@@ -25,11 +30,11 @@ export async function updateGlobalPortSettings(setting) {
   const response = await fetch(GLOBAL_SETTINGS_UPDATE_URL, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      setting
-    })
+      setting,
+    }),
   });
 
   if (!response.ok) {
@@ -49,7 +54,7 @@ export async function updateGlobalNoteSetting(note) {
   if (!getRes.ok) throw new Error("Failed to fetch current settings");
   const payload = await getRes.json();
   const records = payload?.data?.data || [];
-  const targetRecord = records.find(item => item?.id === 1);
+  const targetRecord = records.find((item) => item?.id === 1);
   const currentSetting = targetRecord?.setting || {};
 
   const newSetting = { ...currentSetting, note };
@@ -57,11 +62,11 @@ export async function updateGlobalNoteSetting(note) {
   const response = await fetch(GLOBAL_SETTINGS_UPDATE_URL, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      setting: newSetting
-    })
+      setting: newSetting,
+    }),
   });
 
   if (!response.ok) {
