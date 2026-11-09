@@ -2,6 +2,15 @@
 const AUTH_KEY = "yoursai_global_auth_token";
 const VALID_TOKEN = "yoursai_authenticated";
 
+// 登录凭据：只存哈希，源码里看不到明文密码
+const VALID_USERNAME = "yoursai";
+const VALID_PASSWORD_HASH = "81767608c80c2a532a3d018a6c7f7940bd0ad2c715cc0d9db7bcff2f3495658c"; // SHA-256(password)
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function checkAuth() {
   return sessionStorage.getItem(AUTH_KEY) === VALID_TOKEN;
 }
@@ -44,8 +53,9 @@ function renderLoginOverlay() {
   const passwordInput = document.getElementById("auth-password");
   const errorMsg = document.getElementById("auth-error");
 
-  function attemptLogin() {
-    if (usernameInput.value === "yoursai" && passwordInput.value === "yoursai90803") {
+  async function attemptLogin() {
+    const hash = await sha256Hex(passwordInput.value);
+    if (usernameInput.value === VALID_USERNAME && hash === VALID_PASSWORD_HASH) {
       sessionStorage.setItem(AUTH_KEY, VALID_TOKEN);
       overlay.remove();
       document.body.style.overflow = "";
