@@ -6,8 +6,8 @@
 // const GLOBAL_SETTINGS_UPDATE_URL =
 //   "https://zyvera.cn/common_backend/common/v2/api/update/1?themeTable=MSetting&db=global";
 
-const GLOBAL_SETTINGS_URL = "https://nocommonapi.zyvera.cn/common/v2/api/all?themeTable=MSetting&db=global";
-const GLOBAL_SETTINGS_UPDATE_URL = "https://nocommonapi.zyvera.cn/common/v2/api/update/1?themeTable=MSetting&db=global";
+const GLOBAL_SETTINGS_URL = "https://nocommonapi.yoursai.cn/common/v2/api/all?themeTable=MSetting&db=global";
+const GLOBAL_SETTINGS_UPDATE_URL = "https://nocommonapi.yoursai.cn/common/v2/api/update/1?themeTable=MSetting&db=global";
 
 /**
  * Fetch global project port settings.
